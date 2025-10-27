@@ -2,55 +2,39 @@
 #include "task.h"
 #include "semphr.h"
 #include <stdio.h>
-
-#include <stdio.h>
 #include "pico/stdlib.h"
+#include "hardware/pio.h"
+#include "hardware/timer.h"
 
+#include "quadrature_encoder.pio.h"
 
-/* Semaphores */
-SemaphoreHandle_t semaphores[4];
+int main() {
+    int new_value, delta, old_value = 0;
+    int last_value = -1, last_delta = -1;
 
-/* Task function */
-void vTask(void *pvParameters)
-{
-    int taskNum = (int)pvParameters;
+    // Base pin to connect the A phase of the encoder.
+    // The B phase must be connected to the next pin
+    const uint PIN_AB = 16;
 
-    for (;;)
-    {
-        // Wait for my semaphore
-        xSemaphoreTake(semaphores[taskNum], portMAX_DELAY);
-
-        // Critical section: do my work
-        printf("Hello from task %d\n", taskNum + 1);
-
-        // Release next task’s semaphore
-        int nextTask = (taskNum + 1) % 4;
-        vTaskDelay(pdTICKS_TO_MS(100)); // Simulate work with a delay
-        xSemaphoreGive(semaphores[nextTask]);
-    }
-}
-
-int main(void)
-{
     stdio_init_all();
+    printf("Hello from quadrature encoder\n");
 
+    PIO pio = pio0;
+    const uint sm = 0;
 
-    for (int i = 0; i < 4; i++)
-    {
-        semaphores[i] = xSemaphoreCreateBinary();
+    pio_add_program(pio, &quadrature_encoder_program);
+    quadrature_encoder_program_init(pio, sm, PIN_AB, 0);
+
+    while (1) {
+        new_value = quadrature_encoder_get_count(pio, sm);
+        delta = new_value - old_value;
+        old_value = new_value;
+
+        if (new_value != last_value || delta != last_delta ) {
+            printf("position %8d, delta %6d\n", new_value, delta);
+            last_value = new_value;
+            last_delta = delta;
+        }
+        sleep_ms(100);
     }
-
-    for (int i = 0; i < 4; i++)
-    {
-        char name[10];
-        snprintf(name, sizeof(name), "Task%d", i + 1);
-        xTaskCreate(vTask, name, configMINIMAL_STACK_SIZE, (void *)i, 1, NULL);
-    }
-
-    xSemaphoreGive(semaphores[0]);
-
-    vTaskStartScheduler();
-
-    // Should never reach here
-    for (;;);
 }
