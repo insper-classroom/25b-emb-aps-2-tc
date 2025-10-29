@@ -6,7 +6,7 @@
 #include "hardware/pio.h"
 #include "hardware/timer.h"
 
-#include "quadrature_encoder.pio.h"
+#include "pico_emb.pio.h"
 
 int main() {
     int new_value, delta, old_value = 0;
@@ -26,7 +26,7 @@ int main() {
     quadrature_encoder_program_init(pio, sm, PIN_AB, 0);
 
     while (1) {
-        new_value = quadrature_encoder_get_count(pio, sm);
+        new_value = quadrature_encoder_get_count(pio, sm) ;
         delta = new_value - old_value;
         old_value = new_value;
 
