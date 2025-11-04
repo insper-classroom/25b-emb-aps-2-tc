@@ -21,6 +21,13 @@ const uint PIN_POT = 26;
 const float CONVERSION_FACTOR = 3.3f / 4095.0f;
 const int NUM_SAMPLES = 10;
 
+// UART queue
+QueueHandle_t xQueueUART;
+
+typedef struct uart {
+    int control;
+    int val;
+} uart;
 
 void encoder_task(void *p) {
     int new_value, delta, old_value = 0;
@@ -41,11 +48,17 @@ void encoder_task(void *p) {
         old_value = new_value;
 
         if (new_value != last_value || delta != last_delta ) {
-            printf("position %8d, delta %6d\n", new_value, delta);
+            // printf("position %8d, delta %6d\n", new_value, delta);
             last_value = new_value;
             last_delta = delta;
+            uart data;
+    
+            data.control = 0;
+            data.val = new_value;
+    
+            if (new_value) xQueueSend(xQueueUART, &data, 0);
         }
-        sleep_ms(100);
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
@@ -53,7 +66,7 @@ static uint16_t read_stable_adc() {
     uint32_t total = 0;
     for (int i = 0; i < NUM_SAMPLES; i++) {
         total += adc_read();
-        vTaskDelay(pdMS_TO_TICKS(50));
+        // busy_wait_us(100);
     }
     return (uint16_t)(total / NUM_SAMPLES);
 }
@@ -70,24 +83,46 @@ void potentiometer_task(void *p) {
         position_raw = read_stable_adc();
 
         if (position_raw != last_position_raw) {            
-            printf("Posição Bruta: %u\n", position_raw); 
+            // printf("Posição Bruta: %u\n", position_raw); 
             last_position_raw = position_raw;
             
             // 
             // É ESTE VALOR 'position_raw' (0-4095) que você deve
             // calibrar (min/max) e enviar para o PC via USB HID.
             //
+
+            uart data;
+
+            data.control = 1;
+            data.val = position_raw;
+
+            xQueueSend(xQueueUART, &data, 0);
         }
 
         vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
 
+void uart_task(void *p) {
+    uart data;
+
+    while (1) {
+        if (xQueueReceive(xQueueUART, &data, pdMS_TO_TICKS(100))) {
+            uart_putc_raw(uart0, -1);
+            uart_putc_raw(uart0, data.control);
+            uart_putc_raw(uart0, data.val);
+            uart_putc_raw(uart0, data.val >> 8);
+        }        
+    }
+}
+
 int main() {
-ç    stdio_init_all();
+    stdio_init_all();
 
     xTaskCreate(encoder_task, "Encoder Task", 8192, NULL, 1, NULL);
     xTaskCreate(potentiometer_task, "Potentiometer Task", 8192, NULL, 1, NULL);
+
+    xQueueUART = xQueueCreate(3, sizeof(uart));
 
     vTaskStartScheduler();
 
