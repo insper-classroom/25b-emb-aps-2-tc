@@ -101,7 +101,7 @@ def serial_ports():
                 s = serial.Serial(port)
                 s.close()
                 ports.append(port)
-            except (OSError, serial.SerialException):
+            except Exception as e:
                 pass
     elif sys.platform.startswith('linux') or sys.platform.startswith('cygwin'):
         ports = glob.glob('/dev/tty[A-Za-z]*')

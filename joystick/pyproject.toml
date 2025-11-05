@@ -3,6 +3,7 @@ name = "joystick"
 version = "0.1.0"
 requires-python = ">=3.13"
 dependencies = [
-    "serial>=0.0.97",
+    "pyautogui>=0.9.54",
+    "pyserial>=3.5",
     "vgamepad>=0.1.0",
 ]
