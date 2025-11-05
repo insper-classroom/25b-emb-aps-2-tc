@@ -12,15 +12,15 @@ from time import sleep
 
 # --- Constantes de Mapeamento ---
 # TODO: Calibre estes valores!
-# Pedal (Potenciômetro): 0-4095
-PEDAL_MIN_RAW = 0
+# Pedal (Potenciômetro): 7-4095
+PEDAL_MIN_RAW = 7
 PEDAL_MAX_RAW = 4095
 
 # Volante (Encoder): 
 # Descubra o valor máximo que seu encoder envia para uma volta completa
-# Ex: 900 graus de rotação = -5000 a +5000
-STEERING_MIN_RAW = -5000 
-STEERING_MAX_RAW = 5000
+# Ex: 900 graus de rotação = -1000 a +1000
+STEERING_MIN_RAW = -1000
+STEERING_MAX_RAW = 1000
 # ---------------------------------
 
 def map_value(value, in_min, in_max, out_min, out_max):
@@ -36,24 +36,24 @@ def map_value(value, in_min, in_max, out_min, out_max):
     in_span = in_max - in_min
     out_span = out_max - out_min
     
-    scaled_value = float(value - in_min) / float(in_span)
-    return out_min + (scaled_value * out_span)
+    scaled_value = float(value) / float(in_span)
+    return scaled_value
 
 
 def atualizar_joystick(gamepad, control_id, value):
     """Atualiza o joystick virtual com base no controle e valor."""
     
     if control_id == 0:  # Volante (Encoder)
-        # Mapeia o range do encoder (ex: -5000 a 5000) para o eixo X (-1.0 a 1.0)
-        mapped_val = map_value(value, STEERING_MIN_RAW, STEERING_MAX_RAW, -1.0, 1.0)
+        # Mapeia o range do encoder (ex: -1000 a 1000) para o eixo X (-1.0 a 1.0)
+        mapped_val = map_value(value, STEERING_MIN_RAW, STEERING_MAX_RAW, -1.0, 1.0) * - 2.0
         gamepad.left_joystick_float(x_value_float=mapped_val, y_value_float=0.0)
-        # print(f"Volante: {value} -> {mapped_val:.2f}")
+        print(f"Volante: {value} -> {mapped_val:.2f}")
 
     elif control_id == 1:  # Pedal (Potenciômetro)
-        # Mapeia o range do ADC (0-4095) para o gatilho direito (0.0 a 1.0)
+        # Mapeia o range do ADC (7-4095) para o gatilho direito (0.0 a 1.0)
         mapped_val = map_value(value, PEDAL_MIN_RAW, PEDAL_MAX_RAW, 0.0, 1.0)
         gamepad.right_trigger_float(value_float=mapped_val)
-        # print(f"Pedal: {value} -> {mapped_val:.2f}")
+        #print(f"Pedal: {value} -> {mapped_val:.2f}")
 
     # Envia a atualização para o driver do joystick
     gamepad.update()
@@ -78,6 +78,7 @@ def loop_leitura_serial(ser, gamepad, status_label, mudar_cor_circulo):
             
             # print(data)
             control_id, value = parse_data(data)
+
             atualizar_joystick(gamepad, control_id, value)
 
     except serial.SerialException as e:

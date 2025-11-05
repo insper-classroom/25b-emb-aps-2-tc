@@ -2,6 +2,7 @@
 #include "task.h"
 #include "semphr.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include "pico/stdlib.h"
 #include "hardware/pio.h"
 #include "hardware/timer.h"
@@ -18,8 +19,8 @@ const uint PIN_AB = 16;
 
 // Potentiometer
 const uint PIN_POT = 26;
-const float CONVERSION_FACTOR = 3.3f / 4095.0f;
 const int NUM_SAMPLES = 10;
+const int ADC_TOLERANCE = 5;
 
 // UART queue
 QueueHandle_t xQueueUART;
@@ -34,7 +35,6 @@ void encoder_task(void *p) {
     int last_value = -1, last_delta = -1;
 
     stdio_init_all();
-    printf("Hello from quadrature encoder\n");
 
     PIO pio = pio0;
     const uint sm = 0;
@@ -43,7 +43,7 @@ void encoder_task(void *p) {
     quadrature_encoder_program_init(pio, sm, PIN_AB, 0);
 
     while (1) {
-        new_value = quadrature_encoder_get_count(pio, sm) / 2.222;
+        new_value = quadrature_encoder_get_count(pio, sm);
         delta = new_value - old_value;
         old_value = new_value;
 
@@ -56,7 +56,7 @@ void encoder_task(void *p) {
             data.control = 0;
             data.val = new_value;
     
-            if (new_value) xQueueSend(xQueueUART, &data, 0);
+            xQueueSend(xQueueUART, &data, 0);
         }
         vTaskDelay(pdMS_TO_TICKS(10));
     }
@@ -82,15 +82,11 @@ void potentiometer_task(void *p) {
         adc_select_input(0);
         position_raw = read_stable_adc();
 
-        if (position_raw != last_position_raw) {            
-            // printf("Posição Bruta: %u\n", position_raw); 
+        uint16_t diff = abs(position_raw - last_position_raw);
+
+        if (diff > ADC_TOLERANCE) {
             last_position_raw = position_raw;
             
-            // 
-            // É ESTE VALOR 'position_raw' (0-4095) que você deve
-            // calibrar (min/max) e enviar para o PC via USB HID.
-            //
-
             uart data;
 
             data.control = 1;
@@ -99,7 +95,7 @@ void potentiometer_task(void *p) {
             xQueueSend(xQueueUART, &data, 0);
         }
 
-        vTaskDelay(pdMS_TO_TICKS(50));
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
@@ -119,10 +115,11 @@ void uart_task(void *p) {
 int main() {
     stdio_init_all();
 
+    xQueueUART = xQueueCreate(3, sizeof(uart));
+
     xTaskCreate(encoder_task, "Encoder Task", 8192, NULL, 1, NULL);
     xTaskCreate(potentiometer_task, "Potentiometer Task", 8192, NULL, 1, NULL);
-
-    xQueueUART = xQueueCreate(3, sizeof(uart));
+    xTaskCreate(uart_task, "UART Task", 8192, NULL, 1, NULL);
 
     vTaskStartScheduler();
 
