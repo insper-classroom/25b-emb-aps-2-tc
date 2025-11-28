@@ -11,17 +11,23 @@ import vgamepad as vg  # Importa o vgamepad
 from time import sleep
 
 # --- Constantes de Mapeamento ---
-# TODO: Calibre estes valores!
-# Pedal (Potenciômetro): 7-4095
-PEDAL_MIN_RAW = 7
-PEDAL_MAX_RAW = 4095
+# Pedal Aceleredador (Potenciômetro): 7-4095
+THROTTLE_MIN_RAW = 7
+THROTTLE_MAX_RAW = 4095
+
+# Pedal Freio (Potenciômetro): 0-4095
+BRAKE_MIN_RAW = 0
+BRAKE_MAX_RAW = 4095
 
 # Volante (Encoder): 
-# Descubra o valor máximo que seu encoder envia para uma volta completa
-# Ex: 900 graus de rotação = -1000 a +1000
 STEERING_MIN_RAW = -1000
 STEERING_MAX_RAW = 1000
 # ---------------------------------
+
+# --- Controles ---
+# 0 - Encoder do volante
+# 1 e 2 - Potenciômetros de acelerador e freio, respectivamente
+# 3 e 4 - Botões de upshift e downshift, respectivamente
 
 def map_value(value, in_min, in_max, out_min, out_max):
     """Mapeia linearmente um valor de um range para outro."""
@@ -47,13 +53,29 @@ def atualizar_joystick(gamepad, control_id, value):
         # Mapeia o range do encoder (ex: -1000 a 1000) para o eixo X (-1.0 a 1.0)
         mapped_val = map_value(value, STEERING_MIN_RAW, STEERING_MAX_RAW, -1.0, 1.0) * - 2.0
         gamepad.left_joystick_float(x_value_float=mapped_val, y_value_float=0.0)
-        print(f"Volante: {value} -> {mapped_val:.2f}")
+        #print(f"Volante: {value} -> {mapped_val:.2f}")
 
-    elif control_id == 1:  # Pedal (Potenciômetro)
+    elif control_id == 1:  # Pedal Acelerador (Potenciômetro)
         # Mapeia o range do ADC (7-4095) para o gatilho direito (0.0 a 1.0)
-        mapped_val = map_value(value, PEDAL_MIN_RAW, PEDAL_MAX_RAW, 0.0, 1.0)
+        mapped_val = map_value(value, THROTTLE_MIN_RAW, THROTTLE_MAX_RAW, 0.0, 1.0)
         gamepad.right_trigger_float(value_float=mapped_val)
         #print(f"Pedal: {value} -> {mapped_val:.2f}")
+
+    elif control_id == 2:  # Pedal Freio (Potenciômetro)
+        # Mapeia o range do ADC (7-4095) para o gatilho direito (0.0 a 1.0)
+        mapped_val = map_value(value, THROTTLE_MIN_RAW, THROTTLE_MAX_RAW, 0.0, 1.0)
+        gamepad.left_trigger_float(value_float=mapped_val)
+        #print(f"Pedal: {value} -> {mapped_val:.2f}")
+
+    elif control_id == 3: # Upshift (Botão)
+        gamepad.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_RIGHT_SHOULDER)
+        gamepad.update()
+        gamepad.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_RIGHT_SHOULDER)
+
+    elif control_id == 4: # Downshift (Botão)
+        gamepad.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_LEFT_SHOULDER)
+        gamepad.update()
+        gamepad.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_LEFT_SHOULDER)
 
     # Envia a atualização para o driver do joystick
     gamepad.update()
@@ -125,10 +147,12 @@ def parse_data(data):
     """Interpreta os dados recebidos (control_id + valor)."""
     control_id = data[0]
     
-    if control_id == 1: # Pedal (Potenciômetro) é unsigned
-        value = int.from_bytes(data[1:3], byteorder='little', signed=False)
-    else: # Volante (Encoder) é signed
+    if control_id == 0: # Volante (Encoder) é signed
         value = int.from_bytes(data[1:3], byteorder='little', signed=True)
+    if control_id == 1 or control_id == 2: # Pedal (Potenciômetro) é unsigned
+        value = int.from_bytes(data[1:3], byteorder='little', signed=False)
+    if control_id == 3 or control_id == 4:
+        value = 1
         
     return control_id, value
 
