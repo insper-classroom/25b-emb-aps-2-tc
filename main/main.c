@@ -22,7 +22,7 @@ const uint PIN_AB = 16;
 const uint PIN_POT_THROTTLE = 26;
 const uint PIN_POT_BRAKE = 27;
 const int NUM_SAMPLES = 10;
-const int ADC_TOLERANCE = 5;
+const int ADC_TOLERANCE = 20;
 
 // Paddle shifters
 const uint PIN_BTN_UPSHIFT = 2;
@@ -57,7 +57,7 @@ void encoder_task(void *p) {
         old_value = new_value;
 
         if (new_value != last_value || delta != last_delta ) {
-            printf("encoder position %8d, delta %6d\n", new_value, delta);
+            //printf("encoder position %8d, delta %6d\n", new_value, delta);
             last_value = new_value;
             last_delta = delta;
             uart data;
@@ -65,7 +65,7 @@ void encoder_task(void *p) {
             data.control = 0;
             data.val = new_value;
     
-            // xQueueSend(xQueueUART, &data, 0);
+            xQueueSend(xQueueUART, &data, 0);
         }
         vTaskDelay(pdMS_TO_TICKS(10));
     }
@@ -86,7 +86,7 @@ void throttle_potentiometer_task(void *p) {
 
     adc_init();
     adc_gpio_init(PIN_POT_THROTTLE);
-    
+
     while (1) {
         adc_select_input(0);
         position_raw = read_stable_adc();
@@ -94,7 +94,7 @@ void throttle_potentiometer_task(void *p) {
         uint16_t diff = abs(position_raw - last_position_raw);
 
         if (diff > ADC_TOLERANCE) {
-            printf("throttle position raw: %d\n", position_raw);
+            //printf("throttle position raw: %d\n", position_raw);
             last_position_raw = position_raw;
             
             uart data;
@@ -102,7 +102,7 @@ void throttle_potentiometer_task(void *p) {
             data.control = 1;
             data.val = position_raw;
 
-            // xQueueSend(xQueueUART, &data, 0);
+            xQueueSend(xQueueUART, &data, 0);
         }
 
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -115,7 +115,7 @@ void brake_potentiometer_task(void *p) {
 
     adc_init();
     adc_gpio_init(PIN_POT_BRAKE);
-    
+
     while (1) {
         adc_select_input(1);
         position_raw = read_stable_adc();
@@ -123,7 +123,7 @@ void brake_potentiometer_task(void *p) {
         uint16_t diff = abs(position_raw - last_position_raw);
 
         if (diff > ADC_TOLERANCE) {
-            printf("brake position raw: %d\n", position_raw);
+            //printf("brake position raw: %d\n", position_raw);
             last_position_raw = position_raw;
             
             uart data;
@@ -131,7 +131,7 @@ void brake_potentiometer_task(void *p) {
             data.control = 2;
             data.val = position_raw;
 
-            // xQueueSend(xQueueUART, &data, 0);
+            xQueueSend(xQueueUART, &data, 0);
         }
 
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -166,9 +166,9 @@ void paddle_shifters_btn_task(void *p) {
 
             data.control = 3;
             data.val = 1;
-            printf("upshift\n");
+            //printf("upshift\n");
 
-            // xQueueSend(xQueueUART, &data, 0);
+            xQueueSend(xQueueUART, &data, 0);
             vTaskDelay(pdMS_TO_TICKS(50));
         }
 
@@ -176,12 +176,12 @@ void paddle_shifters_btn_task(void *p) {
             uart data;
 
             data.control = 4;
-            data.val = 1;
+            data.val = (uint16_t)1;
 
-            printf("downshift\n");
+            //printf("downshift\n");
 
-            // xQueueSend(xQueueUART, &data, 0);
-            vTaskDelay(pdMS_TO_TICKS(50));
+            xQueueSend(xQueueUART, &data, 0);
+            vTaskDelay(pdMS_TO_TICKS(20));
         }
     }
 }
@@ -201,17 +201,18 @@ void uart_task(void *p) {
 
 
 int main() {
+
     stdio_init_all();
 
-    xQueueUART = xQueueCreate(4, sizeof(uart));
+    xQueueUART = xQueueCreate(5, sizeof(uart));
     xSemaphore_Upshift = xSemaphoreCreateBinary();
     xSemaphore_Downshift = xSemaphoreCreateBinary();
 
-    xTaskCreate(encoder_task, "Encoder Task", 8192, NULL, 1, NULL);
-    xTaskCreate(paddle_shifters_btn_task, "Paddle Shifters Btn Task", 8192, NULL, 1, NULL);
-    // xTaskCreate(throttle_potentiometer_task, "Throttle Potentiometer Task", 8192, NULL, 1, NULL);
-    // xTaskCreate(brake_potentiometer_task, "Brake Potentiometer Task", 8192, NULL, 1, NULL);
-    xTaskCreate(uart_task, "UART Task", 8192, NULL, 1, NULL);
+    xTaskCreate(throttle_potentiometer_task, "Throttle Potentiometer Task", 256, NULL, 1, NULL);
+    xTaskCreate(brake_potentiometer_task, "Brake Potentiometer Task", 256, NULL, 1, NULL);
+    xTaskCreate(encoder_task, "Encoder Task", 256, NULL, 1, NULL);
+    xTaskCreate(paddle_shifters_btn_task, "Paddle Shifters Btn Task", 256, NULL, 1, NULL);
+    xTaskCreate(uart_task, "UART Task", 256, NULL, 1, NULL);
 
     vTaskStartScheduler();
 

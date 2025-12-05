@@ -8,7 +8,7 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox
 import vgamepad as vg  # Importa o vgamepad
-from time import sleep
+from time import sleep, time
 
 # --- Constantes de Mapeamento ---
 # Pedal Aceleredador (Potenciômetro): 7-4095
@@ -20,8 +20,8 @@ BRAKE_MIN_RAW = 0
 BRAKE_MAX_RAW = 4095
 
 # Volante (Encoder): 
-STEERING_MIN_RAW = -1000
-STEERING_MAX_RAW = 1000
+STEERING_MIN_RAW = -600
+STEERING_MAX_RAW = 600
 # ---------------------------------
 
 # --- Controles ---
@@ -70,12 +70,20 @@ def atualizar_joystick(gamepad, control_id, value):
     elif control_id == 3: # Upshift (Botão)
         gamepad.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_RIGHT_SHOULDER)
         gamepad.update()
-        gamepad.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_RIGHT_SHOULDER)
+        sleep(0.01)  # Pequena pausa para garantir o registro do botão
+        gamepad.release_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_RIGHT_SHOULDER)
+        gamepad.update()
+        
+        #print("Upshift")
 
     elif control_id == 4: # Downshift (Botão)
         gamepad.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_LEFT_SHOULDER)
         gamepad.update()
-        gamepad.press_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_LEFT_SHOULDER)
+        sleep(0.01)  # Pequena pausa para garantir o registro do botão
+        gamepad.release_button(button=vg.XUSB_BUTTON.XUSB_GAMEPAD_LEFT_SHOULDER)
+        gamepad.update()
+
+        #print("Downshift")
 
     # Envia a atualização para o driver do joystick
     gamepad.update()
